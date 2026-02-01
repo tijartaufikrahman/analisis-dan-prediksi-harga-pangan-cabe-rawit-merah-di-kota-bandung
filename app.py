@@ -9,7 +9,7 @@ from statsmodels.tsa.statespace.sarimax import SARIMAX
 from sklearn.metrics import mean_squared_error
 from statsmodels.stats.diagnostic import acorr_ljungbox
 from itertools import product
-from joblib import Parallel, delayed
+# from joblib import Parallel, delayed
 
 
 # Baru 
