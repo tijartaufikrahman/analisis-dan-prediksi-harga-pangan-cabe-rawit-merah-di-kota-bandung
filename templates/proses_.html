@@ -1,0 +1,374 @@
+{% extends "layout.html" %}
+{% block title %}Uji Stasioneritas{% endblock %}
+
+{% block content %}
+
+<div class="row mt-3">
+    <div class="col-12">
+        <h4>Uji Stasioneritas Data (Train)</h4>
+    </div>
+</div>
+
+<div class="card shadow-sm mt-3">
+    <div class="card-body">
+        <div class="row">
+            <label class="form-label">Pilih File Data</label>
+            <div class="col-3">
+                <select id="fileSelect" class="form-control"></select>
+            </div>
+            <div class="col-4">
+                <button id="btnProses" class="btn btn-primary">
+                    Proses Data
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ================= DATA PREVIEW ================= -->
+<div class="accordion mt-4" id="accordionData">
+
+    <div class="accordion-item">
+        <h2 class="accordion-header">
+            <button class="accordion-button collapsed"
+                data-bs-toggle="collapse"
+                data-bs-target="#collapseData">
+                Ringkasan Data (Train, Test, Prediksi)
+            </button>
+        </h2>
+
+        <div id="collapseData" class="accordion-collapse collapse">
+            <div class="accordion-body">
+                <div id="hasilData"></div>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+
+<!-- ================= UJI STASIONER ================= -->
+<div class="accordion mt-3 d-none" id="accordionStasioner">
+
+    <div class="accordion-item">
+        <h2 class="accordion-header">
+            <button class="accordion-button collapsed"
+                data-bs-toggle="collapse"
+                data-bs-target="#collapseStasioner">
+                Hasil Uji Stasioneritas (ADF)
+                <!-- Hasil Uji Stasioneritas (ADF & KPSS) -->
+            </button>
+        </h2>
+
+        <div id="collapseStasioner" class="accordion-collapse collapse">
+            <div class="accordion-body">
+                <div id="hasilStasioner"></div>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+<div class="accordion mt-3 d-none" id="accordionDiff">
+    <div class="accordion-item">
+        <h2 class="accordion-header">
+            <button class="accordion-button collapsed"
+                data-bs-toggle="collapse"
+                data-bs-target="#collapseDiff">
+                Hasil Setelah Differencing (d = 1)
+            </button>
+        </h2>
+        <div id="collapseDiff" class="accordion-collapse collapse">
+            <div class="accordion-body">
+                <div id="hasilDiff"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+<div class="accordion mt-3 d-none" id="accordionACF">
+    <div class="accordion-item">
+        <h2 class="accordion-header">
+            <button class="accordion-button collapsed"
+                data-bs-toggle="collapse"
+                data-bs-target="#collapseACF">
+                Plot ACF & PACF
+            </button>
+        </h2>
+        <div id="collapseACF" class="accordion-collapse collapse">
+            <div class="accordion-body">
+                <div id="hasilACF"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+
+{% endblock %}
+
+{% block scripts %}
+
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+
+<script>
+
+$(document).ready(function(){
+
+    $.get("/get-files", function(files){
+
+        $("#fileSelect").append(`<option value="">-- Pilih File --</option>`);
+
+        files.forEach(function(file){
+            $("#fileSelect").append(`<option value="${file}">${file}</option>`);
+        });
+
+    });
+
+});
+
+
+$("#btnProses").click(function(){
+
+    const file = $("#fileSelect").val();
+
+    if(!file){
+        alert("Pilih file dulu");
+        return;
+    }
+
+    $("#btnProses").prop("disabled", true).text("Memproses...");
+
+    $.ajax({
+        url: "/split-data-auto",
+        type: "POST",
+        contentType: "application/json",
+        data: JSON.stringify({ file: file }),
+        success: function(res){
+
+            $("#btnProses").prop("disabled", false).text("Proses Data");
+
+            if(!res.success){
+                $("#hasilData").html(`<div class="alert alert-danger">${res.message}</div>`);
+                return;
+            }
+
+            let html = `
+                <div class="alert alert-info">
+                    Train: ${res.train_len} <br>
+                    Test: ${res.test_len} <br>
+                    Prediksi: ${res.pred_len}
+                </div>
+            `;
+
+            html += buildTable("TRAIN", res.train);
+            html += buildTable("TEST", res.test);
+            html += buildTable("PREDIKSI", res.pred);
+
+            $("#hasilData").html(html);
+
+            // ================= UJI STASIONER =================
+            runUjiStasioner(file);
+
+        }
+    });
+
+});
+
+
+function runUjiStasioner(file){
+
+    $.ajax({
+        url: "/uji-stasioner",
+        type: "POST",
+        contentType: "application/json",
+        data: JSON.stringify({ file: file }),
+        success: function(res){
+
+            if(!res.success){
+                $("#hasilStasioner").html(
+                    `<div class="alert alert-danger">${res.message}</div>`
+                );
+                return;
+            }
+
+            // ================= UJI AWAL =================
+            $("#accordionStasioner").removeClass("d-none");
+
+            let html = `
+                <table class="table table-bordered">
+                    <thead>
+                        <tr>
+                            <th>Metode</th>
+                            <th>Statistic</th>
+                            <th>p-value</th>
+                            <th>Kesimpulan</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>ADF</td>
+                            <td>${res.adf_stat}</td>
+                            <td>${res.adf_pvalue}</td>
+                            <td>${res.adf_result}</td>
+                        </tr>
+                        <tr class="d-none">
+                            <td>KPSS</td>
+                            <td>${res.kpss_stat}</td>
+                            <td>${res.kpss_pvalue}</td>
+                            <td>${res.kpss_result}</td>
+                        </tr>
+                    </tbody>
+                </table>
+                <div class="alert  mt-3" style="backgroud-color:#f5f5f5;">
+                    Kesimpulan Awal: <strong>${res.final_result}</strong>
+                </div>
+            `;
+
+            $("#hasilStasioner").html(html);
+
+            // ================= DIFFERENCING =================
+            if(res.differencing_done && res.diff_series){
+
+            $("#accordionDiff").removeClass("d-none");
+
+            let diffHtml = `
+                <div class="row">
+
+                    <div class="col-md-6">
+                        <canvas id="diffChart"></canvas>
+                    </div>
+
+                    <div class="col-md-6">
+                        <div class="alert " style="background-color:#f5f5f5;">
+                            <h5>Insight</h5>
+                            <p>Data tidak stasioner pada level awal.</p>
+                            <p>Dilakukan differencing sebanyak <strong>d = 1</strong>.</p>
+                            <p>Grafik menunjukkan perubahan nilai antar periode.</p>
+                        </div>
+                    </div>
+
+                </div>
+            `;
+
+            $("#hasilDiff").html(diffHtml);
+
+            // ===== DRAW CHART =====
+            new Chart(
+                document.getElementById("diffChart"),
+                {
+                    type: "line",
+                    data: {
+                        labels: res.diff_series.map((_, i) => i + 1),
+                        datasets: [{
+                            label: "Differencing (d=1)",
+                            data: res.diff_series,
+                            borderColor: "orange",
+                            backgroundColor: "rgba(255,165,0,0.2)",
+                            tension: 0.2
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        animation: false
+                    }
+                }
+            );
+
+        } else {
+
+            $("#accordionDiff").addClass("d-none");
+            $("#hasilDiff").html("");
+
+        }
+
+            loadACFPACF();
+        }
+
+        
+    });
+}
+
+
+
+function buildTable(title, data){
+
+    let html = `
+        <h5 class="mt-4">DATA ${title}</h5>
+        <table class="table table-bordered">
+            <thead>
+                <tr>
+                    <th>No</th>
+                    <th>Bulan</th>
+                    <th>Harga</th>
+                </tr>
+            </thead>
+            <tbody>
+    `;
+
+    data.forEach(function(d,i){
+        html += `
+            <tr>
+                <td>${i+1}</td>
+                <td>${d.bulan}</td>
+                <td>${formatRupiah(d.harga)}</td>
+            </tr>
+        `;
+    });
+
+    html += "</tbody></table>";
+
+    return html;
+}
+
+
+function formatRupiah(angka){
+    return "Rp " + Number(angka).toLocaleString("id-ID", {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2
+    });
+}
+
+</script>
+
+
+<script>
+    function loadACFPACF(){
+
+    $.ajax({
+        url: "/plot-acf-pacf",
+        type: "POST",
+        success: function(res){
+
+            if(!res.success){
+                alert(res.message);
+                return;
+            }
+
+            $("#accordionACF").removeClass("d-none");
+
+            let html = `
+                <div class="row">
+                    <div class="col-md-6">
+                        <h6>ACF (d = ${res.d_used})</h6>
+                        <img class="img-fluid"
+                             src="data:image/png;base64,${res.acf_plot}" />
+                    </div>
+                    <div class="col-md-6">
+                        <h6>PACF (d = ${res.d_used})</h6>
+                        <img class="img-fluid"
+                             src="data:image/png;base64,${res.pacf_plot}" />
+                    </div>
+                </div>
+            `;
+
+            $("#hasilACF").html(html);
+
+        }
+    });
+}
+
+</script>
+
+{% endblock %}

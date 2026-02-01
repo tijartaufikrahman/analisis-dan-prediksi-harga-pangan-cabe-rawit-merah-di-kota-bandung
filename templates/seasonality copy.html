@@ -1,0 +1,185 @@
+{% extends "layout.html" %}
+{% block title %}Deteksi Musiman STL{% endblock %}
+
+{% block content %}
+
+
+
+
+
+
+
+<div class="card shadow-sm">
+    <div class="card-body">
+
+        <h4 class="mb-3">Deteksi Musiman (STL + Seasonal Strength)</h4>
+
+        <!-- INPUT DATA -->
+        <div class="mb-3">
+            <label class="form-label">Data (pisahkan dengan koma)</label>
+            <textarea id="inputData" class="form-control"
+                placeholder="Contoh: 10,12,15,20,18,22,25,30,28,35,40,38"></textarea>
+        </div>
+
+        <div class="row">
+            <div class="col-md-3">
+                <label class="form-label">Max s</label>
+                <input type="number" id="max_s" class="form-control" value="12">
+            </div>
+
+            <div class="col-md-3">
+                <label class="form-label">Threshold</label>
+                <input type="number" step="0.01" id="threshold"
+                       class="form-control" value="0.3">
+            </div>
+
+            <div class="col-md-3">
+                <label class="form-label">Min Cycles</label>
+                <input type="number" id="min_cycles"
+                       class="form-control" value="3">
+            </div>
+        </div>
+
+        <button class="btn btn-primary mt-3" onclick="prosesSeasonality()">
+            <i class="bi bi-search"></i> Deteksi Musiman
+        </button>
+
+        <hr>
+
+        <!-- HASIL -->
+        <div id="hasilRekomendasi" class="mb-3"></div>
+
+        <!-- TABEL -->
+        <div class="table-responsive">
+            <table class="table table-bordered table-striped">
+                <thead>
+                    <tr>
+                        <th>s</th>
+                        <th>Seasonal Strength</th>
+                        <th>Adjusted Strength</th>
+                        <th>Cycles</th>
+                    </tr>
+                </thead>
+                <tbody id="resultTable"></tbody>
+            </table>
+        </div>
+
+        <!-- CHART -->
+        <canvas id="strengthChart" height="100"></canvas>
+
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<script>
+let chart = null;
+
+function prosesSeasonality() {
+
+    const raw = document.getElementById("inputData").value.trim();
+
+    if (!raw) {
+        alert("Data tidak boleh kosong");
+        return;
+    }
+
+    const arr = raw
+        .split(",")
+        .map(x => parseFloat(x.trim()))
+        .filter(x => !isNaN(x));
+
+    if (arr.length === 0) {
+        alert("Format data salah");
+        return;
+    }
+
+    // RESET UI
+    document.getElementById("hasilRekomendasi").innerHTML = "";
+    document.getElementById("resultTable").innerHTML = "";
+
+    if (chart !== null) {
+        chart.destroy();
+        chart = null;
+    }
+
+    fetch("/test/seasonality-stl", {
+        method: "POST",
+        headers: { 
+            "Content-Type": "application/json",
+            "Cache-Control": "no-cache"
+        },
+        body: JSON.stringify({
+            data: arr,
+            max_s: parseInt(document.getElementById("max_s").value),
+            threshold: parseFloat(document.getElementById("threshold").value),
+            min_cycles: parseInt(document.getElementById("min_cycles").value)
+        })
+    })
+    .then(res => {
+        if (!res.ok) throw new Error("Server error");
+        return res.json();
+    })
+    .then(data => {
+
+        if (!data.success) {
+            document.getElementById("hasilRekomendasi").innerHTML =
+                `<div class="alert alert-danger">${data.message}</div>`;
+            return;
+        }
+
+        // Rekomendasi
+        document.getElementById("hasilRekomendasi").innerHTML =
+            `<div class="alert alert-success">
+                <strong>Rekomendasi:</strong> ${data.recommendation}
+             </div>`;
+
+        const table = document.getElementById("resultTable");
+        const labels = [];
+        const adjustedValues = [];
+
+        data.tested_periods.forEach(row => {
+
+            labels.push(row.s);
+            adjustedValues.push(row.adjusted_strength);
+
+            const tr = document.createElement("tr");
+            tr.innerHTML = `
+                <td>${row.s}</td>
+                <td>${Number(row.seasonal_strength).toFixed(4)}</td>
+                <td>${Number(row.adjusted_strength).toFixed(4)}</td>
+                <td>${row.cycles}</td>
+            `;
+
+            table.appendChild(tr);
+        });
+
+        const ctx = document.getElementById("strengthChart").getContext("2d");
+
+        chart = new Chart(ctx, {
+            type: "line",
+            data: {
+                labels: labels,
+                datasets: [{
+                    label: "Adjusted Strength",
+                    data: adjustedValues,
+                    tension: 0.3
+                }]
+            },
+            options: {
+                responsive: true,
+                animation: false
+            }
+        });
+
+    })
+    .catch(err => {
+        document.getElementById("hasilRekomendasi").innerHTML =
+            `<div class="alert alert-danger">Terjadi error pada server</div>`;
+        console.error(err);
+    });
+}
+</script>
+{% endblock %}

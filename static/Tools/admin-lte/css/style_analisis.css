@@ -1,0 +1,256 @@
+﻿:root {
+    --bg: #f6f8fb;
+    --card: #ffffff;
+    --muted: #5b6b7a;
+    --accent: #3aa0ff;
+    --border: #e6eef7;
+    --radius: 10px;
+}
+
+* {
+    box-sizing: border-box
+}
+
+body {
+    margin: 0;
+    font-family: Inter,system-ui,Arial;
+    background: var(--bg);
+    color: #102027
+}
+
+/* Layout */
+.dash-wrap {
+    margin: 18px auto;
+    padding: 14px
+}
+
+.dash-lead {
+    color: var(--muted);
+    margin: 6px 0 12px;
+    font-size: 13px
+}
+
+/* Progress */
+#progressBarWrap {
+    position: fixed;
+    left: 50%;
+    transform: translateX(-50%);
+    top: 12px;
+    width: 80%;
+    max-width: 920px;
+    z-index: 9999;
+    background: rgba(255,255,255,.95);
+    border: 1px solid rgba(0,0,0,.06);
+    padding: 10px;
+    border-radius: 12px;
+    box-shadow: 0 10px 30px rgba(18,45,78,.06);
+    display: none;
+    align-items: center;
+    gap: 12px
+}
+
+#progressText {
+    font-size: 14px;
+    min-width: 140px
+}
+
+#progressBarOuter {
+    flex: 1;
+    background: #eef5fb;
+    border-radius: 999px;
+    height: 14px;
+    overflow: hidden
+}
+
+#progressBarInner {
+    height: 100%;
+    width: 0%;
+    background: linear-gradient(90deg,var(--accent),#79c7ff);
+    transition: width .2s
+}
+
+/* Card */
+.dash-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 12px;
+    margin-top: 14px;
+    box-shadow: 0 6px 18px rgba(16,32,48,.03)
+}
+
+/* Flex */
+.dash-flex {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+    align-items: center
+}
+
+/* Form */
+label {
+    font-size: 13px;
+    color: var(--muted)
+}
+
+input, select, button {
+    padding: 8px 10px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    font-size: 13px
+}
+
+.dash-btn-primary {
+    background: linear-gradient(90deg,var(--accent),#63b8ff);
+    border: none;
+    color: #fff;
+    font-weight: 600
+}
+
+/* Chips */
+.dash-chips {
+    display: flex;
+    gap: 8px;
+    margin-top: 10px;
+    flex-wrap: wrap
+}
+
+.dash-chip {
+    background: #f1f6fb;
+    padding: 8px 12px;
+    border-radius: 20px;
+    color: var(--muted);
+    border: 1px solid #e9f2fb;
+    font-size: 13px
+}
+
+/* Grid */
+.dash-layout {
+    display: grid;
+    grid-template-columns: 1fr 360px;
+    gap: 14px;
+    margin-top: 14px
+}
+
+@media(max-width:1000px) {
+    .dash-layout {
+        grid-template-columns: 1fr
+    }
+}
+
+/* Chart */
+.dash-chartWrap {
+    min-height: 300px;
+    border-radius: 8px;
+    padding: 8px;
+    background: linear-gradient(180deg,#fff,#fbfdff);
+    border: 1px solid var(--border)
+}
+
+canvas {
+    width: 100% !important;
+    height: 100% !important;
+}
+
+
+/* Table */
+table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px
+}
+
+thead th {
+    background: #fbfdff;
+    padding: 10px;
+    text-align: left;
+    border-bottom: 1px solid var(--border)
+}
+
+td, th {
+    padding: 8px;
+    border-bottom: 1px solid #f4f6f9
+}
+
+/* Insight */
+.dash-insight {
+    margin-top: 8px;
+    padding: 10px;
+    background: #fbfdff;
+    border-radius: 8px;
+    border: 1px solid var(--border)
+}
+
+.dash-small {
+    font-size: 13px;
+    color: var(--muted)
+}
+
+/* Checkbox */
+.dash-checkboxGrid {
+    display: grid;
+    grid-template-columns: repeat(2,1fr);
+    gap: 8px;
+    max-height: 220px;
+    overflow: auto;
+    padding: 6px
+}
+
+.dash-checkboxItem {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px;
+    border-radius: 8px;
+    background: #fff;
+    border: 1px solid var(--border)
+}
+
+@media(max-width:420px) {
+    .dash-checkboxGrid {
+        grid-template-columns: 1fr
+    }
+}
+
+
+/* file sarima_model */
+.sarima-best-aic {
+    background-color: #d4edda; /* hijau lembut */
+    font-weight: 600;
+}
+
+
+/* Untuk File Forcasting */
+.forecast-loading {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    padding: 24px;
+}
+
+.spinner {
+    width: 42px;
+    height: 42px;
+    border: 4px solid #e5e7eb;
+    border-top: 4px solid #ff4d4d;
+    border-radius: 50%;
+    animation: spin 0.9s linear infinite;
+}
+
+.loading-text {
+    font-size: 14px;
+    color: #555;
+    font-weight: 500;
+}
+
+@keyframes spin {
+    from {
+        transform: rotate(0deg);
+    }
+
+    to {
+        transform: rotate(360deg);
+    }
+}

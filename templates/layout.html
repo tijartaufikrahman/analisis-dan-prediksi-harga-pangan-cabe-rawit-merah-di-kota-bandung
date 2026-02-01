@@ -1,0 +1,148 @@
+{% set path = request.path.lower() %}
+
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>{% block title %}{% endblock %}</title>
+
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <!-- jQuery -->
+    <script src="https://code.jquery.com/jquery-3.7.1.js"></script>
+
+    <!-- Bootstrap Icons -->
+    <link rel="stylesheet"
+          href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.13.1/font/bootstrap-icons.min.css">
+
+    <!-- Google Font -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
+          rel="stylesheet">
+
+    <!-- Bootstrap -->
+    <link rel="stylesheet"
+          href="https://cdnjs.cloudflare.com/ajax/libs/twitter-bootstrap/5.3.3/css/bootstrap.min.css">
+
+    <!-- AdminLTE -->
+    <link rel="stylesheet"
+          href="{{ url_for('static', filename='Tools/admin-lte/css/adminlte.css') }}">
+
+    <link rel="stylesheet"
+          href="{{ url_for('static', filename='Tools/admin-lte/css/style_analisis.css') }}">
+
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+
+        .app-sidebar,
+        .app-sidebar .sidebar-wrapper {
+            background-color: #ffffff !important;
+        }
+
+        .ofactive {
+            background-color: #0093AD !important;
+            border-radius: 4px;
+        }
+
+        .ofactive a { color: #fff !important; }
+
+        .hover-btn:hover {
+            filter: brightness(90%);
+        }
+    </style>
+</head>
+
+<body class="sidebar-expand-lg sidebar-open bg-body-tertiary">
+
+<div class="app-wrapper">
+
+    <!-- NAVBAR -->
+    <nav class="navbar navbar-expand bg-body"
+         style="height:88px;position:sticky;top:0;z-index:99;
+         box-shadow:0 2px 4px -1px rgba(0,0,0,.1)">
+        <div class="container-fluid">
+
+            <a class="nav-link" data-lte-toggle="sidebar" href="#">
+                <i class="bi bi-list"></i>
+            </a>
+
+            <div class="ms-auto">
+                <span>Tijar Taufik Rahman</span>
+            </div>
+
+        </div>
+    </nav>
+
+    <!-- SIDEBAR -->
+    <aside class="app-sidebar shadow-sm"
+           style="height:100vh;position:sticky;top:0;">
+
+        <!-- LOGO -->
+        <div style="box-shadow:0 1px 4px -1px rgba(0,0,0,.1);
+                    padding:0 25px;">
+            <div class="d-flex justify-content-center">
+                <a href="/" class="brand-link">
+                    <img src="{{ url_for('static', filename='Tools/content/img/pihps.png') }}"
+                         style="width:155px;">
+                </a>
+            </div>
+        </div>
+
+        <!-- MENU -->
+        <div class="sidebar-wrapper mt-2">
+            <ul class="nav sidebar-menu flex-column">
+
+                <li class="nav-item {{ 'ofactive' if path == '/proses' else '' }}">
+                    <a href="/proses" class="nav-link">
+                        <i class="bi bi-database-fill"></i>
+                        <p>Proses (Developer)</p>
+                    </a>
+                </li>
+
+                <!-- <li class="nav-item {{ 'ofactive' if path == '/home/analisis' else '' }}">
+                    <a href="/home/Analisis" class="nav-link">
+                        <i class="bi bi-bar-chart-line-fill"></i>
+                        <p>Analisis</p>
+                    </a>
+                </li>
+
+                <li class="nav-item {{ 'ofactive' if path == '/home/prediksi' else '' }}">
+                    <a href="/home/Prediksi" class="nav-link">
+                        <i class="bi bi-arrow-up-right-circle-fill"></i>
+                        <p>Prediksi</p>
+                    </a>
+                </li> -->
+
+                <li class="nav-item {{ 'ofactive' if path == '/' else '' }}">
+                    <a href="/" class="nav-link">
+                        <i class="bi bi-arrow-up-right-circle-fill"></i>
+                        <p>Prediksi Harga (User)</p>
+                    </a>
+                </li>
+
+            </ul>
+        </div>
+    </aside>
+
+    <!-- MAIN -->
+    <main class="app-main">
+        <div class="app-content px-3">
+            {% block content %}{% endblock %}
+        </div>
+    </main>
+
+</div>
+
+<!-- Bootstrap -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/twitter-bootstrap/5.3.3/js/bootstrap.bundle.min.js"></script>
+
+<!-- Chart Js -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+
+<!-- AdminLTE -->
+<script src="{{ url_for('static', filename='Tools/admin-lte/js/adminlte.js') }}"></script>
+
+{% block scripts %}{% endblock %}
+
+</body>
+</html>

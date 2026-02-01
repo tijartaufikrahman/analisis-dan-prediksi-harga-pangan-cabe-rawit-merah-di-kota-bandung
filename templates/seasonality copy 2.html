@@ -1,0 +1,973 @@
+{% extends "layout.html" %}
+{% block title %}Split + STL{% endblock %}
+
+{% block content %}
+
+        
+
+    
+
+<div class="row">
+    <div class="row mt-3">
+        <div class="col-12">
+            <h4>Prediksi Harga</h4>
+        </div>
+    </div>
+    <div class="col-12">
+        <div class="card shadow-sm mt-3">
+            <div class="card-body">
+                <div class="row">
+                    <label class="form-label">Pilih File Data</label>
+                    <div class="col-3">
+                        <div class="mb-3">
+                            
+                            <select id="fileSelect" class="form-control"></select>
+                        </div>
+                    </div>
+                    <div class="col-4">
+                        <button id="btnSplit" class="btn btn-primary">
+                            Submit
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Accordion Preview -->
+<div class="accordion mt-4 " id="accordionPreview">
+    <div class="accordion-item">
+        <h2 class="accordion-header">
+            <button class="accordion-button collapsed"
+                    type="button"
+                    data-bs-toggle="collapse"
+                    data-bs-target="#collapsePreview"
+                    style="border:0; box-shadow:none;">
+                Ringkasan Pembagian Dataset
+            </button>
+        </h2>
+        <div id="collapsePreview" class="accordion-collapse collapse">
+            <div class="accordion-body">
+                <div id="hasil"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+<!-- Accordion STL -->
+<div class="accordion mt-3 " id="accordionSTL">
+    <div class="accordion-item">
+        <h2 class="accordion-header">
+            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseSTL">
+                Hasil Deteksi Musiman (STL)
+            </button>
+        </h2>
+        <div id="collapseSTL" class="accordion-collapse collapse">
+            <div class="accordion-body">
+                <div id="hasilSTL"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+<hr class="my-4">
+
+<button id="btnSarima" class="btn text-white d-none" onclick="btnSarimaTrain()" style="background-color: #00849B;">
+    Jalankan SARIMA Grid
+</button>
+
+<div id="hasilSarima" class="mt-4"></div>
+
+<!-- ============= -->
+ <hr class="my-4">
+
+<button id="btnForwardPred" class="btn d-none text-white" onclick="btnForwardPred()" style="background-color: #00849B;">
+    Jalankan Evaluasi Model (Prediksi)
+</button>
+
+<div id="hasilForwardPred" class="mt-4"></div>
+
+<!-- ============= -->
+
+{% endblock %}
+
+{% block scripts %}
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+
+<script>
+let lastTestData = [];
+let lastGridModels = [];
+
+let lastTestLabels = [];
+let lastPredLabels = [];
+
+
+
+$(document).ready(function(){
+
+    $.get("/get-files", function(files){
+
+        $("#fileSelect").append(`<option value="">-- Pilih File --</option>`);
+
+        files.forEach(function(file){
+            $("#fileSelect").append(`<option value="${file}">${file}</option>`);
+        });
+
+    });
+
+});
+
+$("#btnSplit").click(function(){
+
+    const file = $("#fileSelect").val();
+
+    if(!file){
+        alert("Pilih file dulu");
+        return;
+    }
+
+    $("#btnSplit").prop("disabled", true).text("Memproses...");
+
+    $.ajax({
+        url: "/split-data-auto",
+        type: "POST",
+        contentType: "application/json",
+        data: JSON.stringify({ file: file }),
+        success: function(res){
+
+            $("#btnSplit").prop("disabled", false).text("Submit");
+
+            if(!res.success){
+                $("#hasil").html(`<div class="alert alert-danger">${res.message}</div>`);
+                return;
+            }
+
+            let html = `
+                <div class="alert alert-info">
+                    File: ${res.filename}<br>
+                    Train: ${res.train_len}<br>
+                    Test: ${res.test_len}<br>
+                    Prediksi: ${res.pred_len}
+                </div>
+            `;
+
+            html += buildTable("TRAIN", res.train);
+            html += buildTable("TEST", res.test);
+            html += buildTable("PREDIKSI", res.pred);
+
+            // Kesimpulan
+            lastTestLabels = res.test.map(d => d.bulan);
+            lastPredLabels = res.pred.map(d => d.bulan);
+            // Kesimpulan
+
+
+            $("#hasil").html(html);
+
+            // ===== STL RESULT =====
+            let stlHtml = `
+                <div class="alert alert-success">
+                    Rekomendasi: ${res.recommendation}
+                    <br>Best s : ${res.best_s}
+                </div>
+            `;
+
+            stlHtml += `
+                <table class="table table-bordered">
+                <thead>
+                    <tr>
+                        <th>s (periode berulang)</th>
+                        <th>Strength</th>
+                        <!--<th>Adjusted</th>-->
+                    </tr>
+                </thead>
+                <tbody>
+            `;
+
+            res.stl_results.forEach(function(r){
+                stlHtml += `
+                    <tr>
+                        <td>${r.s}</td>
+                        <td>${r.seasonal_strength}</td>
+                        <!--<td>${r.adjusted_strength}</td>-->
+                    </tr>
+                `;
+            });
+
+
+
+            stlHtml += "</tbody></table>";
+
+            $("#hasilSTL").html(stlHtml);
+            
+            runSarimaGrid();
+        }
+    });
+
+});
+
+function buildTable(title, data){
+
+    let html = `
+        <h5 class="mt-4">DATA ${title}</h5>
+        <table class="table table-bordered">
+            <thead>
+                <tr>
+                    <th>No</th>
+                    <th>Bulan</th>
+                    <th>Harga</th>
+                </tr>
+            </thead>
+            <tbody>
+    `;
+
+    data.forEach(function(d,i){
+        html += `
+            <tr>
+                <td>${i+1}</td>
+                <td>${d.bulan}</td>
+                <td>${formatRupiah(d.harga)}</td>
+
+                </tr>
+                `;
+                // <td>${Number(d.harga).toFixed(2)}</td>
+    });
+
+    html += "</tbody></table>";
+
+    return html;
+}
+
+</script>
+
+
+<script>
+
+let lastFilteredModels = [];
+
+
+// $("#btnSarima").click(function(){
+
+function runSarimaGrid() {
+
+
+
+    $("#btnSarima").prop("disabled", true).text("Processing...");
+    $("#hasilSarima").html("");
+
+    $.ajax({
+        url: "/sarima-grid",
+        type: "POST",
+        success: function(res){
+
+            
+
+            $("#btnSarima").prop("disabled", false)
+                           .text("Jalankan SARIMA Grid");
+
+            if(!res.success){
+                $("#hasilSarima").html(
+                    `<div class="alert alert-danger">${res.message}</div>`
+                );
+                return;
+            }
+
+            const test = res.test || [];
+            
+            
+
+            const filteredModels = (res.models || []).filter(m => 
+                parseFloat(m.MAPE) <= 10
+                // parseFloat(m.MAPE) <= 1000
+            );
+            lastFilteredModels = filteredModels;
+            
+            // Kesimpulan
+            lastTestData = test;
+            lastGridModels = filteredModels;
+            // Kesimpulan
+
+
+
+            if(filteredModels.length === 0){
+                $("#hasilSarima").html(
+                    `<div class="alert alert-warning">
+                        Tidak ada model dengan MAPE ≤ 10%
+                    </div>`
+                );
+                return;
+            }
+
+            let html = `<div class="accordion" id="accordionSarima">`;
+
+            /* ================= RANKING ================= */
+            html += `
+            <div class="accordion-item mb-3">
+                <h2 class="accordion-header">
+                    <button class="accordion-button"
+                        data-bs-toggle="collapse"
+                        data-bs-target="#collapseRanking">
+                        Evaluasi Model (Train vs Test)
+                    </button>
+                </h2>
+                <div id="collapseRanking"
+                     class="accordion-collapse collapse show">
+                    <div class="accordion-body p-3">
+                        <table class="table table mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th class="text-center">No</th>
+                                    <th class="text-center">Order</th>
+                                    <th class="text-center">Seasonal</th>
+                                    <th class="text-center">MAPE</th>
+                                    <th class="text-center">MSE</th> 
+                                    <th class="text-center">RMSE</th>
+                                    <th class="text-center d-none">R²</th>
+                                    <th class="text-center d-none">Corr</th>
+                                    <th class="text-center d-none">AIC</th>
+                                    <th class="text-center">White Noise (p-value)</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+            `;
+
+            filteredModels.forEach(function(m,i){
+                // <tr class="${i===0?'table-success fw-bold':''}">
+                html += `
+                    <tr class="">
+                        <td class="text-center">${i+1}</td>
+                        <td class="text-center">${m.order.join(",")}</td>
+                        <td class="text-center">${m.seasonal.join(",")}</td>
+                        <td class="text-center">${m.MAPE}%</td>
+                        <td class="text-center">${m.MSE}</td>   
+                        <td class="text-center">${m.RMSE}</td>
+                        <td class="text-center  d-none">${m.R2}</td>
+                        <td class="text-center  d-none">${m.CORR}</td>
+                        <td class="text-center d-none">${m.AIC}</td>
+                        <td class="text-center">${m.white_noise ? m.white_noise.toFixed(4) : "-"}</td>
+                    </tr>
+                `;
+            });
+
+            html += `
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            `;
+
+            /* ================= DETAIL MODEL ================= */
+            html += `
+            <div class="accordion-item mb-3">
+                <h2 class="accordion-header">
+                    <button class="accordion-button"
+                        data-bs-toggle="collapse"
+                        data-bs-target="#collapseCharts">
+                        Grafik Evaluasi Model (Train vs Test)
+                    </button>
+                </h2>
+                <div id="collapseCharts"
+                     class="accordion-collapse collapse show">
+                    <div class="accordion-body">
+                        <div class="accordion">
+            `;
+
+            filteredModels.forEach(function(m,i){
+
+                html += `
+                <div class="accordion-item">
+                    <h2 class="accordion-header">
+                        <button class="accordion-button"
+                            data-bs-toggle="collapse"
+                            data-bs-target="#model-${i}">
+                            Model #${i+1} (Train vs Aktual)|
+                            SARIMA(${m.order.join(",")})
+                            (${m.seasonal.join(",")})
+                            | MAPE: ${m.MAPE}% 
+                            | RMSE: ${m.RMSE}
+                            <!--| AIC: ${m.AIC}-->
+                            | White Noise: ${m.white_noise ? m.white_noise.toFixed(4) : "-"}
+                        </button>
+                    </h2>
+
+                    <div id="model-${i}"
+                         class="accordion-collapse collapse show">
+                        <div class="accordion-body">
+
+                            <div class="row">
+
+                                <div class="col-md-6">
+                                    <canvas id="canvas-${i}"></canvas>
+                                </div>
+
+                                <div class="col-md-6">
+                                    <table class="table table-sm table-bordered">
+                                        <thead class="table-light">
+                                            <tr>
+                                                <th>Periode</th>
+                                                <th>Aktual</th>
+                                                <th>Forecast</th>
+                                                <th>Error</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            ${test.map((val,idx)=>{
+                                                const fc = m.forecast[idx] ?? null;
+                                                return `
+                                                <tr>
+                                                    <td>${lastTestLabels[idx]}</td>
+                                                    <td>${formatRupiah(val)}</td>
+                                                    <td>${fc !== null ? formatRupiah(fc) : "-"}</td>
+                                                    <td>${fc !== null ? formatRupiah(val - fc) : "-"}</td>
+
+                                                </tr>`;
+                                            }).join("")}
+                                        </tbody>
+                                    </table>
+                                </div>
+
+                            </div>
+
+                        </div>
+                    </div>
+                </div>
+                `;
+            });
+
+            html += `
+                        </div>
+                    </div>
+                </div>
+            </div>
+            </div>
+            `;
+
+            $("#hasilSarima").html(html);
+
+            /* ================= DRAW CHART ================= */
+
+            filteredModels.forEach(function(m,i){
+
+                const labels = lastTestLabels;
+
+
+                new Chart(
+                    document.getElementById(`canvas-${i}`),
+                    {
+                        type:"line",
+                        data:{
+                            labels: labels,
+                            datasets:[
+                                {
+                                    label:"Aktual (Test)",
+                                    data: test,
+                                    borderDash:[5,5]
+                                },
+                                {
+                                    label:"Forecast",
+                                    data: m.forecast.slice(0,test.length)
+                                }
+                            ]
+                        },
+                        options:{
+                            responsive:true,
+                            animation:false
+                        }
+                    }
+                );
+            });
+            btnForwardPred();
+
+        },
+        error: function(){
+            $("#btnSarima").prop("disabled", false)
+                           .text("Jalankan SARIMA Grid");
+
+            $("#hasilSarima").html(
+                `<div class="alert alert-danger">
+                    Terjadi error saat menjalankan SARIMA
+                </div>`
+            );
+        }
+    });
+
+    
+};
+</script>
+
+
+
+<script>
+    // $("#btnForwardPred").click(function(){
+function btnForwardPred(){
+
+
+
+    if(lastFilteredModels.length === 0){
+        alert("Jalankan SARIMA Grid dulu");
+        return;
+    }
+
+    $("#btnForwardPred")
+        .prop("disabled", true)
+        .text("Processing...");
+
+    $.ajax({
+        url: "/sarima-forward-pred",
+        type: "POST",
+        contentType: "application/json",
+        data: JSON.stringify({
+            models: lastFilteredModels
+        }),
+        success: function(res){
+
+            $("#btnForwardPred")
+                .prop("disabled", false)
+                .text("Jalankan Evaluasi Model (Prediksi)");
+
+            if(!res.success){
+                $("#hasilForwardPred").html(
+                    `<div class="alert alert-danger">${res.message}</div>`
+                );
+                return;
+            }
+
+            const actualPred = res.actual_pred || [];
+
+            // ==== ambil, filter, urutkan ====
+            let models = res.models || [];
+
+            models = models.map(m => ({
+                ...m,
+                MAPE_PRED: Number(m.MAPE_PRED)
+            }));
+
+            // models = models
+            //     .filter(m => m.MAPE_PRED < 10)
+            //     .sort((a,b) => a.MAPE_PRED - b.MAPE_PRED);
+
+            if(models.length === 0){
+                $("#hasilForwardPred").html(`
+                    <div class="alert alert-warning">
+                        Tidak ada model dengan MAPE_PRED &lt; 10%
+                    </div>
+                `);
+                return;
+            }
+
+            let html = `
+            <div class="accordion" id="accordionForwardWrapper">
+                <div class="accordion-item">
+                    <h2 class="accordion-header">
+                        <button class="accordion-button"
+                            type="button"
+                            data-bs-toggle="collapse"
+                            data-bs-target="#collapseForwardAll">
+                            Evaluasi model (model validation Prediksi)
+                        </button>
+                    </h2>
+
+                    <div id="collapseForwardAll"
+                         class="accordion-collapse collapse show">
+                        <div class="accordion-body">
+            `;
+
+            /* ================= TABLE ================= */
+
+            html += `
+            <div class="card mb-4 shadow-none">
+                <div class="card-header fw-bold">
+                    Tabel Evaluasi Model (Train vs Test)
+                </div>
+                <div class="card-body p-0">
+                    <table class="table mb-0">
+                        <thead>
+                            <tr>
+                                <th>No</th>
+                                <th>Order</th>
+                                <th>Seasonal</th>
+                                <th>MAPE Test</th>
+                                <th>MSE Test</th>    
+                                <th>MAPE Pred</th>
+                                <th>MSE Pred</th>    
+                                <th>RMSE Pred</th>
+                                <th class=" d-none">R² Pred</th>
+                                <th class=" d-none">Corr Pred</th>
+
+
+                            </tr>
+                        </thead>
+                        <tbody>
+            `;
+
+            models.forEach((m,i)=>{
+                html += `
+                <tr class="${i===0?'table-success fw-bold':''}">
+                    <td>${i+1}</td>
+                    <td>${m.order.join(",")}</td>
+                    <td>${m.seasonal.join(",")}</td>
+                    <td>${m.MAPE_TEST}%</td>
+                    <td>${m.MSE_TEST}</td>     
+                    <td>${m.MAPE_PRED}%</td>
+                    <td>${m.MSE_PRED}</td>     
+                    <td>${m.RMSE_PRED}</td>
+                    <td class=" d-none">${m.R2_PRED}</td>
+                    <td class=" d-none">${m.CORR_PRED}</td>
+
+
+                </tr>
+                `;
+            });
+
+            html += `
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            `;
+
+            /* ================= GRAFIK PER MODEL ================= */
+
+            models.forEach((m,i)=>{
+
+                html += `
+                <div class="card mb-4 shadow-none">
+                    <div class="card-header fw-bold">
+                        Model #${i+1} |
+                        SARIMA(${m.order.join(",")})
+                        (${m.seasonal.join(",")})
+                        | MAPE_PRED: ${m.MAPE_PRED}%
+                    </div>
+
+                    <div class="card-body">
+
+                        <div class="row">
+
+                            <div class="col-md-6">
+                                <canvas id="forward-canvas-${i}"></canvas>
+                            </div>
+
+                            <div class="col-md-6">
+                                <table class="table table-sm table-bordered">
+                                    <thead>
+                                        <tr>
+                                            <th>Periode</th>
+                                            <th>Aktual</th>
+                                            <th>Forecast</th>
+                                            <th>Error</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        ${actualPred.map((val,idx)=>{
+                                            const fc = m.forecast[idx] ?? null;
+                                            return `
+                                            <tr>
+                                                <td>${lastPredLabels[idx]}</td>
+                                                <td>${formatRupiah(val)}</td>
+                                                <td>${fc !== null ? formatRupiah(fc) : "-"}</td>
+                                                <td>${fc !== null ? formatRupiah(val - fc) : "-"}</td>
+
+                                            </tr>`;
+                                        }).join("")}
+                                    </tbody>
+                                </table>
+                            </div>
+
+                        </div>
+
+                    </div>
+                </div>
+                `;
+            });
+
+            html += `
+                        </div>
+                    </div>
+                </div>
+            </div>
+            `;
+
+            $("#hasilForwardPred").html(html);
+
+            /* ================= DRAW CHART ================= */
+
+            models.forEach((m,i)=>{
+
+            const labels = lastPredLabels;
+
+            new Chart(
+                document.getElementById(`forward-canvas-${i}`),
+                {
+                    type:"line",
+                    data:{
+                        labels: labels,
+                        datasets:[
+                            {
+                                label:"Aktual (GLOBAL_PRED)",
+                                data: actualPred,
+                                borderDash:[5,5]
+                            },
+                            {
+                                label:"Forecast",
+                                data: m.forecast
+                            }
+                        ]
+                    },
+                    options:{
+                        responsive:true,
+                        animation:false
+                    }
+                }
+            );
+
+        });
+
+
+
+
+
+
+
+            // Kesimpulan
+            /* ================= KESIMPULAN MODEL TERBAIK ================= */
+/* ================= KESIMPULAN MODEL TERBAIK ================= */
+
+/* ================= KESIMPULAN MODEL TERBAIK ================= */
+
+const bestForwardModel = models[0];
+
+const bestTrainModel = lastGridModels.find(m =>
+    m.order.join(",") === bestForwardModel.order.join(",") &&
+    m.seasonal.join(",") === bestForwardModel.seasonal.join(",")
+);
+
+let summaryHtml = `
+
+<div class="accordion my-4" id="accordionKesimpulan">
+    <div class="accordion-item">
+        <h2 class="accordion-header">
+            <button class="accordion-button collapsed"
+                type="button"
+                data-bs-toggle="collapse"
+                data-bs-target="#collapseKesimpulan">
+                Kesimpulan
+            </button>
+        </h2>
+
+        <div id="collapseKesimpulan"
+             class="accordion-collapse collapse">
+            <div class="accordion-body">
+`;
+
+/* ===== RINGKASAN ===== */
+
+summaryHtml += `
+<div class="alert  border-0" style="background-color:#f5f5f5;">
+    <strong>Evaluasi Model Terbaik </strong><br>
+    SARIMA(${bestForwardModel.order.join(",")})
+    (${bestForwardModel.seasonal.join(",")})<br><br>
+
+    MAPE Train vs Aktual : ${bestForwardModel.MAPE_TEST}%<br>
+    MAPE Pred            : ${bestForwardModel.MAPE_PRED}%<br>
+    
+</div>
+`;
+// RMSE Pred : ${bestForwardModel.RMSE_PRED}
+
+/* ===== TRAIN VS AKTUAL ===== */
+
+summaryHtml += `
+
+<h5 class="mt-4">Grafik Model Yang Dipakai</h5>
+<div class="row mb-5">
+
+    <div class="col-md-8">
+        <canvas id="best-train-chart"></canvas>
+    </div>
+
+    <div class="col-md-4">
+        <table class="table ">
+            <thead class="table-light">
+                <tr>
+                    <th>Periode</th>
+                    <th>Aktual</th>
+                    <th>Forecast</th>
+                </tr>
+            </thead>
+            <tbody>
+                ${lastTestData.map((val,idx)=>{
+                    const fc = bestTrainModel 
+                        ? bestTrainModel.forecast[idx] 
+                        : null;
+                    return `
+                    <tr>
+                        <td>${lastTestLabels[idx]}</td>
+                        <td>${formatRupiah(val)}</td>
+                        <td>${fc !== null ? formatRupiah(fc) : "-"}</td>
+                    </tr>`;
+                }).join("")}
+            </tbody>
+        </table>
+    </div>
+
+</div>
+`;
+
+/* ===== FORWARD ===== */
+
+summaryHtml += `
+<hr>
+<div class="row mb-4">
+
+    <h4 class="mt-3 mb-2">PREDIKSI HARGA</h4>
+
+    <div class="col-md-6">
+        <h5 class="mt-4">Grafik Prediksi Harga</h5>
+        
+
+        <div style="position:relative; height:350px;">
+            <canvas id="best-forward-chart"></canvas>
+        </div>
+    </div>
+
+    <div class="col-md-6">
+        <h5 class="mt-4 mb-4">Tabel Prediksi Harga</h5>
+        <table class="table  ">
+            <thead class="table-light">
+                <tr>
+                    <th>Periode</th>
+                    <th>Aktual</th>
+                    <th>Forecast</th>
+                    <th>Error</th>
+                </tr>
+            </thead>
+            <tbody>
+                ${actualPred.map((val,idx)=>{
+                    const fc = bestForwardModel.forecast[idx] ?? null;
+                    return `
+                    <tr>
+                        <td>${lastPredLabels[idx]}</td>
+                        <td>${formatRupiah(val)}</td>
+                        <td>${fc !== null ? formatRupiah(fc) : "-"}</td>
+                        <td>${fc !== null ? formatRupiah(val - fc) : "-"}</td>
+                    </tr>`;
+                }).join("")}
+            </tbody>
+        </table>
+    </div>
+
+</div>
+`;
+
+summaryHtml += `
+            </div>
+        </div>
+    </div>
+</div>
+<hr class="mb-3">
+`;
+
+$("#hasilForwardPred").append(summaryHtml);
+
+
+/* ===== DRAW CHART TRAIN ===== */
+
+if(bestTrainModel){
+    new Chart(
+        document.getElementById("best-train-chart"),
+        {
+            type:"line",
+            data:{
+                labels: lastTestLabels,
+                datasets:[
+                    {
+                        label:"Aktual (Test)",
+                        data: lastTestData,
+                        borderDash:[5,5]
+                    },
+                    {
+                        label:"Forecast",
+                        data: bestTrainModel.forecast.slice(0,lastTestData.length)
+                    }
+                ]
+            },
+            options:{
+                responsive:true,
+                animation:false
+            }
+        }
+    );
+}
+
+
+/* ===== DRAW CHART FORWARD ===== */
+
+new Chart(
+    document.getElementById("best-forward-chart"),
+    {
+        type:"line",
+        data:{
+            labels: lastPredLabels,
+            datasets:[
+                {
+                    label:"Aktual (GLOBAL_PRED)",
+                    data: actualPred,
+                    borderDash:[5,5]
+                },
+                {
+                    label:"Forecast",
+                    data: bestForwardModel.forecast
+                }
+            ]
+        },
+        options:{
+            responsive:true,
+            animation:false
+        }
+    }
+);
+
+
+            // Kesimpulan
+
+
+
+
+
+
+
+            
+
+        },
+        error:function(){
+
+            $("#btnForwardPred")
+                .prop("disabled", false)
+                .text("Jalankan Evaluasi Model (Prediksi)");
+
+            $("#hasilForwardPred").html(`
+                <div class="alert alert-danger">
+                    Terjadi error saat forward
+                </div>
+            `);
+        }
+    });
+
+};
+
+</script>
+
+<script>
+    function formatRupiah(angka){
+    return "Rp " + Number(angka).toLocaleString("id-ID", {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2
+    });
+}
+
+</script>
+
+{% endblock %}

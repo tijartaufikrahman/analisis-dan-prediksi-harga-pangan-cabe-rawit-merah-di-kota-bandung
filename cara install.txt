@@ -1,0 +1,20 @@
+python -m venv venv
+
+venv\Scripts\activate
+pip install flask
+
+pip list
+
+# Langsung 
+pip install numpy
+pip install statsmodels pandas matplotlib
+
+
+python app.py
+
+
+
+
+# Untuk Hosting REnder
+pip freeze > requirements.txt
+
