@@ -442,13 +442,16 @@ def sarima_grid():
 
     # results = Parallel(n_jobs=-1)(    # Ini dilokal
     # results = Parallel(n_jobs=1)(       # Hsoting Tapi tidak kuat
-
     #     delayed(run_model)(params) for params in param_grid
-    # )
+    # )    
+    # results = [r for r in results if r is not None]
 
     results = []
+    for params in param_grid:
+        r = run_model(params)
+        if r is not None:
+            results.append(r)
 
-    results = [r for r in results if r is not None]
 
     if not results:
         return jsonify({
@@ -619,10 +622,13 @@ def sarima_forward_pred():
     # results = Parallel(n_jobs=1)( # Hsoting
     #     delayed(run_forward)(m) for m in models
     # )
+    # results = [r for r in results if r is not None]
 
     results = []
-
-    results = [r for r in results if r is not None]
+    for m in models:
+        r = run_forward(m)
+        if r is not None:
+            results.append(r)
 
     if not results:
         return jsonify({
