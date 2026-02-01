@@ -117,7 +117,8 @@ def split_data_auto():
 
         df_bulanan = (
             df["Harga (Rp)"]
-            .resample("M")
+            # .resample("M") 
+            .resample("ME") #Hsoting
             .mean()
             .round(0)
             .astype(int)
