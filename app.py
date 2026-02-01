@@ -440,11 +440,13 @@ def sarima_grid():
             print("ERROR PARAM:", params, "->", str(e))
             return None
 
-    # results = Parallel(n_jobs=-1)(
-    results = Parallel(n_jobs=1)( # Hsoting
+    # results = Parallel(n_jobs=-1)(    # Ini dilokal
+    # results = Parallel(n_jobs=1)(       # Hsoting Tapi tidak kuat
 
-        delayed(run_model)(params) for params in param_grid
-    )
+    #     delayed(run_model)(params) for params in param_grid
+    # )
+
+    results = []
 
     results = [r for r in results if r is not None]
 
@@ -614,9 +616,11 @@ def sarima_forward_pred():
             return None
 
     # results = Parallel(n_jobs=-1)(
-    results = Parallel(n_jobs=1)( # Hsoting
-        delayed(run_forward)(m) for m in models
-    )
+    # results = Parallel(n_jobs=1)( # Hsoting
+    #     delayed(run_forward)(m) for m in models
+    # )
+
+    results = []
 
     results = [r for r in results if r is not None]
 
